@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-st.title("🤖 AI学習シミュレーター")
+st.title("🤖 完成!AI学習シミュレーター")
 st.write("ボタンを押すと、AIがデータの法則を見つけ出します！")
 
 # --- 1. サイドバーで設定を変えられるようにする ---
