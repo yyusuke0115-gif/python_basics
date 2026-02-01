@@ -61,6 +61,44 @@ ax2.legend()
 
 st.pyplot(fig)
 
+# --- (前回のコードの続き、st.pyplot(fig) の後に追加) ---
+
+st.divider()
+st.header("Theoretical Verification")
+
+# 理論値の計算用ロジック
+# 元の分布ごとの理論的な平均(t_mu)と標準偏差(t_sigma)
+if dist_type == "Uniform":
+    # 一様分布 [0, 1] の場合
+    t_mu = 0.5
+    t_sigma = np.sqrt(1/12)
+elif dist_type == "Exponential":
+    # 指数分布 (λ=1) の場合
+    t_mu = 1.0
+    t_sigma = 1.0
+else:
+    # 二項分布 (n=1, p=0.5) の場合
+    t_mu = 0.5
+    t_sigma = 0.5
+
+# 標本平均の理論的標準偏差 (σ / √n)
+theoretical_std = t_sigma / np.sqrt(n)
+
+# 数式の表示
+st.latex(r"E[\bar{X}] = \mu")
+st.latex(r"SE = \frac{\sigma}{\sqrt{n}}")
+
+# 比較テーブル
+st.subheader("Comparison: Simulation vs Theory")
+comparison_data = {
+    "Metric": ["Mean (μ)", "Standard Error (SE)"],
+    "Simulation (Actual)": [f"{mu:.4f}", f"{sigma:.4f}"],
+    "Theory (Expected)": [f"{t_mu:.4f}", f"{theoretical_std:.4f}"]
+}
+st.table(comparison_data)
+
+st.info(f"As n ({n}) increases, the Simulation SE should get closer to the Theory SE.")
+
 # --- Statistics Output ---
 col1, col2 = st.columns(2)
 with col1:
