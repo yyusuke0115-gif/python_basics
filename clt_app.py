@@ -2,50 +2,68 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-st.title("中心極限定理シミュレーター")
+# --- Config ---
+st.title("Central Limit Theorem Simulator")
 
-st.sidebar.header("設定")
+st.sidebar.header("Settings")
 
-# 1. 元の分布を選択
 dist_type = st.sidebar.selectbox(
-    "元の分布を選択してください",
-    ("一様分布 (Uniform)", "指数分布 (Exponential)", "二項分布 (Binomial)")
+    "Select Original Distribution",
+    ("Uniform", "Exponential", "Binomial")
 )
 
-# 2. サンプルサイズ (n) と試行回数 (m)
-n = st.sidebar.slider("サンプルサイズ (一度に引く数 n)", 1, 100, 10)
-m = st.sidebar.slider("試行回数 (平均をとる回数 m)", 100, 10000, 1000)
+n = st.sidebar.slider("Sample Size (n)", 1, 100, 10)
+m = st.sidebar.slider("Number of Iterations (m)", 100, 10000, 1000)
 
-# データの生成
-samples = []
+# --- Data Generation ---
+# Generate parent distribution for visualization
+if dist_type == "Uniform":
+    parent_data = np.random.rand(10000)
+elif dist_type == "Exponential":
+    parent_data = np.random.exponential(scale=1.0, size=10000)
+else:
+    parent_data = np.random.binomial(n=1, p=0.5, size=10000)
 
+# Generate sample means
+sample_means = []
 for _ in range(m):
-    if dist_type == "一様分布 (Uniform)":
+    if dist_type == "Uniform":
         data = np.random.rand(n)
-    elif dist_type == "指数分布 (Exponential)":
+    elif dist_type == "Exponential":
         data = np.random.exponential(scale=1.0, size=n)
-    else: # 二項分布
+    else:
         data = np.random.binomial(n=1, p=0.5, size=n)
-    
-    samples.append(np.mean(data))
+    sample_means.append(np.mean(data))
 
-# 可視化
-fig, ax = plt.subplots()
-ax.hist(samples, bins=50, color='skyblue', edgecolor='black', density=True)
+# --- Visualization ---
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-# 理論上の正規分布（ベルカーブ）の線を重ねるための計算
-mu = np.mean(samples)
-sigma = np.std(samples)
-x = np.linspace(min(samples), max(samples), 100)
+# 1. Parent Distribution
+ax1.hist(parent_data, bins=50, color='lightgray', edgecolor='black')
+ax1.set_title(f"Original {dist_type} Distribution")
+ax1.set_xlabel("Value")
+ax1.set_ylabel("Frequency")
+
+# 2. Sample Mean Distribution (CLT)
+ax2.hist(sample_means, bins=50, color='skyblue', edgecolor='black', density=True)
+
+# Add Normal Distribution Curve
+mu = np.mean(sample_means)
+sigma = np.std(sample_means)
+x = np.linspace(min(sample_means), max(sample_means), 100)
 p = (1 / (np.sqrt(2 * np.pi) * sigma)) * np.exp(-0.5 * ((x - mu) / sigma)**2)
-ax.plot(x, p, 'r', linewidth=2, label='Normal Distribution')
+ax2.plot(x, p, 'r', linewidth=2, label='Normal Dist')
 
-ax.set_title(f"{dist_type} の標本平均の分布 (n={n}, m={m})")
-ax.set_xlabel("平均値")
-ax.set_ylabel("密度")
-ax.legend()
+ax2.set_title(f"Sample Mean Distribution (n={n})")
+ax2.set_xlabel("Mean Value")
+ax2.set_ylabel("Density")
+ax2.legend()
 
 st.pyplot(fig)
 
-st.write(f"**平均:** {mu:.4f}")
-st.write(f"**標準偏差:** {sigma:.4f}")
+# --- Statistics Output ---
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("Sample Mean (μ)", f"{mu:.4f}")
+with col2:
+    st.metric("Std Deviation (σ)", f"{sigma:.4f}")
