@@ -3,67 +3,86 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 
-st.title("Probability Distribution Fitting Tool")
+st.set_page_config(page_title="Multi-Dist Fitting", layout="wide")
+st.title("Probability Distribution Fitting Tool (4 Models)")
 
-# --- 1. Data Generation (Creating an "Unknown" dataset) ---
-st.sidebar.header("1. Generate Data")
-true_dist = st.sidebar.selectbox("True Distribution (The Answer)", ["Normal", "Exponential", "Uniform"])
-sample_size = st.sidebar.slider("Sample Size", 50, 1000, 200)
+# --- 1. Data Generation ---
+st.sidebar.header("1. Settings")
+# 選択肢を増やす
+dist_options = ["Normal", "Exponential", "Uniform", "Gamma", "Laplace"]
+true_dist = st.sidebar.selectbox("True Distribution (The Answer)", dist_options)
+sample_size = st.sidebar.slider("Sample Size", 50, 1000, 300)
 
 if st.sidebar.button("Generate New Data"):
     if true_dist == "Normal":
-        st.session_state.data = np.random.normal(loc=5.0, scale=2.0, size=sample_size)
+        st.session_state.data = np.random.normal(5.0, 2.0, sample_size)
     elif true_dist == "Exponential":
-        st.session_state.data = np.random.exponential(scale=2.0, size=sample_size)
-    else:
-        st.session_state.data = np.random.uniform(low=0, high=10, size=sample_size)
+        st.session_state.data = np.random.exponential(2.0, sample_size)
+    elif true_dist == "Uniform":
+        st.session_state.data = np.random.uniform(0, 10, sample_size)
+    elif true_dist == "Gamma":
+        st.session_state.data = np.random.gamma(shape=2.0, scale=2.0, size=sample_size)
+    elif true_dist == "Laplace":
+        st.session_state.data = np.random.laplace(5.0, 1.0, sample_size)
 
 if 'data' not in st.session_state:
-    st.warning("Please click 'Generate New Data' in the sidebar.")
+    st.info("Please generate data from the sidebar.")
     st.stop()
 
 data = st.session_state.data
 
-# --- 2. Distribution Fitting ---
-st.header("2. Fitting Results")
+# --- 2. Multi-Fitting & Scoring ---
+st.header("Fitting Results & Log-Likelihood")
 
-# Fit to Normal Distribution
-mu_fit, sigma_fit = stats.norm.fit(data)
+# 各分布のフィッティングと対数尤度の計算
+results = {}
 
-# Fit to Exponential Distribution
-loc_fit, scale_fit = stats.expon.fit(data)
+# 1. Normal
+params_norm = stats.norm.fit(data)
+results["Normal"] = (params_norm, stats.norm.logpdf(data, *params_norm).sum())
+
+# 2. Exponential
+params_expon = stats.expon.fit(data)
+results["Exponential"] = (params_expon, stats.expon.logpdf(data, *params_expon).sum())
+
+# 3. Gamma
+params_gamma = stats.gamma.fit(data)
+results["Gamma"] = (params_gamma, stats.gamma.logpdf(data, *params_gamma).sum())
+
+# 4. Laplace
+params_laplace = stats.laplace.fit(data)
+results["Laplace"] = (params_laplace, stats.laplace.logpdf(data, *params_laplace).sum())
 
 # --- 3. Visualization ---
-fig, ax = plt.subplots()
-ax.hist(data, bins=30, density=True, alpha=0.5, color='gray', label='Original Data')
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.hist(data, bins=40, density=True, alpha=0.3, color='gray', label='Generated Data')
 
-# Plot Fitted Normal Curve
-x = np.linspace(min(data), max(data), 100)
-pdf_norm = stats.norm.pdf(x, mu_fit, sigma_fit)
-ax.plot(x, pdf_norm, 'r-', lw=2, label=f'Fitted Normal\n(mu={mu_fit:.2f}, sigma={sigma_fit:.2f})')
+x = np.linspace(min(data), max(data), 200)
+colors = {'Normal': 'red', 'Exponential': 'green', 'Gamma': 'blue', 'Laplace': 'orange'}
 
-# Plot Fitted Exponential Curve
-pdf_expon = stats.expon.pdf(x, loc_fit, scale_fit)
-ax.plot(x, pdf_expon, 'g--', lw=2, label=f'Fitted Expon\n(scale={scale_fit:.2f})')
+for name, (params, log_lh) in results.items():
+    if name == "Normal": pdf = stats.norm.pdf(x, *params)
+    elif name == "Exponential": pdf = stats.expon.pdf(x, *params)
+    elif name == "Gamma": pdf = stats.gamma.pdf(x, *params)
+    elif name == "Laplace": pdf = stats.laplace.pdf(x, *params)
+    
+    ax.plot(x, pdf, label=f"{name} (LL: {log_lh:.1f})", color=colors[name], lw=2)
 
-ax.set_title("Fitting Different Distributions to the Data")
 ax.legend()
 st.pyplot(fig)
 
-st.write("The red line shows the best-fit Normal distribution, and the green dashed line shows the best-fit Exponential distribution.")
+# --- 4. Rank Table ---
+st.subheader("Leaderboard: Which fits best?")
+# スコア順に並び替え
+ranked_results = sorted(results.items(), key=lambda x: x[1][1], reverse=True)
 
-# --- 4. Statistical Comparison (Log-Likelihood) ---
-st.subheader("3. Which is the better fit?")
+cols = st.columns(len(ranked_results))
+for i, (name, (params, log_lh)) in enumerate(ranked_results):
+    with cols[i]:
+        st.metric(f"Rank {i+1}: {name}", f"{log_lh:.1f}")
 
-# 対数尤度を計算（値が大きいほど、その分布である可能性が高い）
-log_likelihood_norm = np.sum(stats.norm.logpdf(data, mu_fit, sigma_fit))
-log_likelihood_expon = np.sum(stats.expon.logpdf(data, loc_fit, scale_fit))
-
-col1, col2 = st.columns(2)
-col1.metric("Normal Fit (Log-LH)", f"{log_likelihood_norm:.2f}")
-col2.metric("Expon Fit (Log-LH)", f"{log_likelihood_expon:.2f}")
-
-if log_likelihood_norm > log_likelihood_expon:
-    st.success("Mathematical Winner: **Normal Distribution**")
+winner = ranked_results[0][0]
+if winner == true_dist:
+    st.success(f"Perfect! The mathematical winner is **{winner}**, which matches the ground truth.")
 else:
-    st.success("Mathematical Winner: **Exponential Distribution**")
+    st.warning(f"Surprise! **{winner}** fits better than the original {true_dist}. This happens with small samples.")
