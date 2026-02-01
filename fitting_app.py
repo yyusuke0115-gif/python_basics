@@ -32,26 +32,35 @@ if 'data' not in st.session_state:
 data = st.session_state.data
 
 # --- 2. Multi-Fitting & Scoring ---
-st.header("Fitting Results & Log-Likelihood")
+st.header("Model Selection (AIC vs Log-Likelihood)")
 
 # 各分布のフィッティングと対数尤度の計算
 results = {}
 
-# 1. Normal
-params_norm = stats.norm.fit(data)
-results["Normal"] = (params_norm, stats.norm.logpdf(data, *params_norm).sum())
+# 各分布のパラメータ数 (k)
+# Normal: mu, sigma (2)
+# Exponential: loc, scale (2)
+# Gamma: shape, loc, scale (3)
+# Laplace: loc, scale (2)
 
-# 2. Exponential
-params_expon = stats.expon.fit(data)
-results["Exponential"] = (params_expon, stats.expon.logpdf(data, *params_expon).sum())
+def calculate_aic(log_lh, k):
+    return -2 * log_lh + 2 * k
 
-# 3. Gamma
-params_gamma = stats.gamma.fit(data)
-results["Gamma"] = (params_gamma, stats.gamma.logpdf(data, *params_gamma).sum())
+# --- Fitting Calculations ---
+# Normal (k=2)
+p_norm = stats.norm.fit(data)
+ll_norm = stats.norm.logpdf(data, *p_norm).sum()
+results["Normal"] = {"params": p_norm, "ll": ll_norm, "aic": calculate_aic(ll_norm, 2)}
 
-# 4. Laplace
-params_laplace = stats.laplace.fit(data)
-results["Laplace"] = (params_laplace, stats.laplace.logpdf(data, *params_laplace).sum())
+# Exponential (k=2)
+p_expon = stats.expon.fit(data)
+ll_expon = stats.expon.logpdf(data, *p_expon).sum()
+results["Exponential"] = {"params": p_expon, "ll": ll_expon, "aic": calculate_aic(ll_expon, 2)}
+
+# Gamma (k=3) ← パラメータが多い！
+p_gamma = stats.gamma.fit(data)
+ll_gamma = stats.gamma.logpdf(data, *p_gamma).sum()
+results["Gamma"] = {"params": p_gamma, "ll": ll_gamma, "aic": calculate_aic(ll_gamma, 3)}
 
 # --- 3. Visualization ---
 fig, ax = plt.subplots(figsize=(10, 5))
@@ -60,29 +69,35 @@ ax.hist(data, bins=40, density=True, alpha=0.3, color='gray', label='Generated D
 x = np.linspace(min(data), max(data), 200)
 colors = {'Normal': 'red', 'Exponential': 'green', 'Gamma': 'blue', 'Laplace': 'orange'}
 
-for name, (params, log_lh) in results.items():
+# ここで results.items() から辞書の中身を取り出すよう修正
+for name, info in results.items():
+    params = info["params"]
+    log_lh = info["ll"]
+    
     if name == "Normal": pdf = stats.norm.pdf(x, *params)
     elif name == "Exponential": pdf = stats.expon.pdf(x, *params)
     elif name == "Gamma": pdf = stats.gamma.pdf(x, *params)
     elif name == "Laplace": pdf = stats.laplace.pdf(x, *params)
     
-    ax.plot(x, pdf, label=f"{name} (LL: {log_lh:.1f})", color=colors[name], lw=2)
+    ax.plot(x, pdf, label=f"{name} (AIC: {info['aic']:.1f})", color=colors[name], lw=2)
 
 ax.legend()
 st.pyplot(fig)
 
-# --- 4. Rank Table ---
-st.subheader("Leaderboard: Which fits best?")
-# スコア順に並び替え
-ranked_results = sorted(results.items(), key=lambda x: x[1][1], reverse=True)
+# --- 4. Rank Table (AIC順: 小さいほど良い) ---
+st.subheader("Leaderboard: Best Model by AIC")
+
+# AICの値で昇順（小さい順）にソート
+ranked_results = sorted(results.items(), key=lambda x: x[1]['aic'], reverse=False)
 
 cols = st.columns(len(ranked_results))
-for i, (name, (params, log_lh)) in enumerate(ranked_results):
+for i, (name, info) in enumerate(ranked_results):
     with cols[i]:
-        st.metric(f"Rank {i+1}: {name}", f"{log_lh:.1f}")
+        # AICを表示。前回との差分としてLog-LHを表示するのも面白いです
+        st.metric(f"Rank {i+1}: {name}", f"AIC: {info['aic']:.1f}", delta=f"LL: {info['ll']:.1f}", delta_color="off")
 
 winner = ranked_results[0][0]
 if winner == true_dist:
-    st.success(f"Perfect! The mathematical winner is **{winner}**, which matches the ground truth.")
+    st.success(f"Perfect! AIC chose **{winner}**, which is the true model.")
 else:
-    st.warning(f"Surprise! **{winner}** fits better than the original {true_dist}. This happens with small samples.")
+    st.warning(f"Note: AIC preferred **{winner}** over the true {true_dist}. (Sample size: {sample_size})")
