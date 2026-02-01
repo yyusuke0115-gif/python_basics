@@ -51,3 +51,19 @@ ax.legend()
 st.pyplot(fig)
 
 st.write("The red line shows the best-fit Normal distribution, and the green dashed line shows the best-fit Exponential distribution.")
+
+# --- 4. Statistical Comparison (Log-Likelihood) ---
+st.subheader("3. Which is the better fit?")
+
+# 対数尤度を計算（値が大きいほど、その分布である可能性が高い）
+log_likelihood_norm = np.sum(stats.norm.logpdf(data, mu_fit, sigma_fit))
+log_likelihood_expon = np.sum(stats.expon.logpdf(data, loc_fit, scale_fit))
+
+col1, col2 = st.columns(2)
+col1.metric("Normal Fit (Log-LH)", f"{log_likelihood_norm:.2f}")
+col2.metric("Expon Fit (Log-LH)", f"{log_likelihood_expon:.2f}")
+
+if log_likelihood_norm > log_likelihood_expon:
+    st.success("Mathematical Winner: **Normal Distribution**")
+else:
+    st.success("Mathematical Winner: **Exponential Distribution**")
